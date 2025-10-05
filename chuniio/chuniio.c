@@ -24,6 +24,9 @@ extern IMAGE_DOS_HEADER __ImageBase;
 #define LEAP_Y 1
 #define LEAP_Z 2
 
+static LONG base_chuni_key_start;
+static LONG base_chuni_key_width;
+static const LONG original_window_width = 1920; // The width your config values are based on
 static BOOL separate_control = FALSE;
 static LONG chuni_ir_trigger_threshold = 7000;
 static LONG chuni_ir_height = 5000;
@@ -85,6 +88,25 @@ static int get_finger_index(DWORD id) {
 }
 
 LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
+    if (msg == WM_SIZE) {
+        if (!separate_control) {
+            LONG window_width = LOWORD(l_param);
+            double scale_factor = (double)window_width / original_window_width;
+            chuni_key_start = (LONG)(base_chuni_key_start * scale_factor);
+            chuni_key_width = (LONG)(base_chuni_key_width * scale_factor);
+            chuni_key_end = chuni_key_start + 32 * chuni_key_width;
+        } else if (target) {
+            D2D1_SIZE_U new_size;
+            new_size.width = LOWORD(l_param);
+            new_size.height = HIWORD(l_param);
+            ID2D1HwndRenderTarget_Resize(target, &new_size);
+            canvas_sz = new_size;
+        }
+
+        // It is crucial to pass the message to the original window procedure
+        return CHUNI_WINPROC;
+    }
+
     if (msg != WM_TOUCH) return separate_control ? DEF_WINPROC : CHUNI_WINPROC;
 
     UINT fingers = LOWORD(w_param);
@@ -262,29 +284,30 @@ HRESULT chuni_io_jvs_init(void) {
     chuni_key_width = GetPrivateProfileIntW(L"slider", L"width", 40, CONFIG);
     raw_input = GetPrivateProfileIntW(L"io", L"raw_input", 0, CONFIG);
     ir_keep_slider = GetPrivateProfileIntW(L"misc", L"ir_keep_slider", 0, CONFIG);
+    base_chuni_key_start = GetPrivateProfileIntW(L"slider", L"offset", 318, CONFIG);
+    base_chuni_key_width = GetPrivateProfileIntW(L"slider", L"width", 40, CONFIG);
+    raw_input = GetPrivateProfileIntW(L"io", L"raw_input", 0, CONFIG);
+    ir_keep_slider = GetPrivateProfileIntW(L"misc", L"ir_keep_slider", 0, CONFIG);
 
     if (separate_control) {
         chuni_key_start = 0;
         log_info("ignoring slider.offset in separate_control mode.\n");
     }
 
-    if (hwnd == NULL) {
-        int a = 0;
-        log_error("can't get window handle for chuni. %d\n", err);
-        HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE) init, NULL, 0, NULL);
-        if (thread) {
-            log_info("started a thread to wait on window...\n");
-        }
-        return S_OK;
+    if (hwnd != NULL && !separate_control) {
+        RECT clientRect;
+        GetClientRect(hwnd, &clientRect);
+        LONG window_width = clientRect.right - clientRect.left;
+        double scale_factor = (double)window_width / original_window_width;
+        chuni_key_start = (LONG)(base_chuni_key_start * scale_factor);
+        chuni_key_width = (LONG)(base_chuni_key_width * scale_factor);
+    } else if (!separate_control) {
+        // Default values if window not found yet
+        chuni_key_start = base_chuni_key_start;
+        chuni_key_width = base_chuni_key_width;
     }
-    if (!separate_control) {
-        ULONG flags;
-        if (!IsTouchWindow(hwnd, &flags)) log_warn("IsTouchWindow() returned false, touch might not work.\n");
-#ifdef _WIN64
-        chuni_wndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&winproc);
-#else
-        chuni_wndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWL_WNDPROC, (LONG_PTR)&winproc);
-#endif
+
+    chuni_key_end = chuni_key_start + 32 * chuni_key_width;
     
         log_info("hooked WNDPROC.\n");
     }
