@@ -1,0 +1,76 @@
+name: Build chunithm-touch
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-x64:
+    name: Build for Windows (64-bit)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-meson
+          mingw-w64-x86_64-ninja
+
+    - name: Configure build
+      shell: msys2 {0}
+      run: meson setup build --cross-file cross-mingw-64.txt
+
+    - name: Compile project
+      shell: msys2 {0}
+      run: meson compile -C build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: chunithm-touch-x64
+        path: build/
+
+  build-x86:
+    name: Build for Windows (32-bit)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW32
+        update: true
+        install: >-
+          mingw-w64-i686-gcc
+          mingw-w64-i686-meson
+          mingw-w64-i686-ninja
+
+    - name: Configure build
+      shell: msys2 {0}
+      run: meson setup build --cross-file cross-mingw-32.txt
+
+    - name: Compile project
+      shell: msys2 {0}
+      run: meson compile -C build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: chunithm-touch-x86
+        path: build/
