@@ -24,6 +24,7 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-meson
           mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-binutils
 
     - name: Configure build
       shell: msys2 {0}
@@ -46,8 +47,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
 
     - name: Set up MSYS2
       uses: msys2/setup-msys2@v2
@@ -58,6 +57,7 @@ jobs:
           mingw-w64-i686-gcc
           mingw-w64-i686-meson
           mingw-w64-i686-ninja
+          mingw-w64-i686-binutils
 
     - name: Configure build
       shell: msys2 {0}
